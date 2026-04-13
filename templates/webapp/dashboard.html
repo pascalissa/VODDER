@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% load vod_filters %}
+
+{% block layout %}
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0; font-size:1.1rem;">
+                Progress: {{ completion_percent }}% 
+                <span style="font-size:0.8rem; font-weight:normal; color:#888;">({{ total_watched|format_seconds }} / {{ total_duration|format_seconds }})</span>
+            </h2>
+            <a href="{% url 'settings' %}"
+                style="color:var(--accent); text-decoration:none; font-size:0.9rem;">Settings</a>
+        </div>
+        <div class="progress-container">
+            <div class="progress-bar" style="width: {{ completion_percent }}%;"></div>
+        </div>
+    </div>
+    <div class="sidebar-content">
+        {% for section in sections %}
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <div style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    SECTION {{ section.number }}: {{ section.title }}
+                </div>
+                <div style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
+                    {{ section.total_duration|format_seconds }}
+                </div>
+            </div>
+            <div class="section-content">
+            {% for module in section.modules.all %}
+            <div class="module" data-module-number="{{ module.number }}">
+                <div class="module-header" onclick="toggleModule(this)">
+                    <div style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        {{ module.number }} {{ module.title }}
+                    </div>
+                    <div style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
+                        {{ module.total_duration|format_seconds }}
+                    </div>
+                </div>
+                <div class="module-videos">
+                    {% for video in module.videos.all %}
+                    <a href="?v={{ video.id }}"
+                        class="video-item {% if current_video and current_video.id == video.id %}active{% endif %}">
+                        <span class="video-item-title">{{ video.number }} {{ video.title }}</span>
+                        <div class="vid-meta">
+                            <span class="vid-dur">{{ video.duration|format_seconds }}</span>
+                            {% if video.is_completed %}
+                            <span class="check-icon">✓</span>
+                            {% else %}
+                            <span class="uncheck-icon"></span>
+                            {% endif %}
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+        {% empty %}
+        <div style="padding: 20px; text-align:center;">
+            <p>No VODs found.</p>
+            <a href="{% url 'settings' %}" class="btn btn-primary">Go to Settings to Sync</a>
+        </div>
+        {% endfor %}
+    </div>
+</aside>
+
+<main class="main-content">
+    {% if current_video %}
+    <div class="video-container">
+        <video id="player" controls autoplay>
+            <source src="{% url 'video_stream' current_video.id %}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    <div class="content-panel">
+        <h1 style="margin-top:0;">{{ current_video.number }} - {{ current_video.title }}</h1>
+        <hr style="border:0; border-bottom:1px solid var(--border-color); margin: 20px 0;">
+
+    </div>
+    {% else %}
+    <div style="flex:1; display:flex; justify-content:center; align-items:center;">
+        <h2>Select a video from the sidebar to begin.</h2>
+    </div>
+    {% endif %}
+</main>
+
+<script>
+    const player = document.getElementById('player');
+
+    {% if current_video %}
+    const VIDEO_ID = {{ current_video.id }};
+
+    let initialSeekDone = false;
+    player.addEventListener('loadedmetadata', () => {
+        const savedSpeed = localStorage.getItem('playbackSpeed');
+        if (savedSpeed) {
+            player.playbackRate = parseFloat(savedSpeed);
+        }
+
+        const savedProgress = parseInt("{{ current_video.progress|default:'0' }}") || 0;
+        if (savedProgress > 0 && String("{{ current_video.is_completed }}").toLowerCase() !== "true" && !initialSeekDone) {
+            player.currentTime = savedProgress;
+        }
+        initialSeekDone = true;
+    });
+
+    player.addEventListener('ratechange', () => {
+        localStorage.setItem('playbackSpeed', player.playbackRate);
+    });
+
+    let lastSavedTime = 0;
+    function saveProgress(isCompleted = false) {
+        const progress = Math.floor(player.currentTime);
+        fetch(`/video/${VIDEO_ID}/progress/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ progress: progress, is_completed: isCompleted })
+        });
+    }
+
+    player.addEventListener('timeupdate', () => {
+        const curr = Math.floor(player.currentTime);
+        if (Math.abs(curr - lastSavedTime) > 10) {
+            saveProgress(false);
+            lastSavedTime = curr;
+        }
+    });
+
+    player.addEventListener('ended', () => {
+        saveProgress(true);
+        setTimeout(() => {
+            const allVideos = Array.from(document.querySelectorAll('.video-item'));
+            const activeItem = document.querySelector('.video-item.active');
+            const currentIndex = allVideos.indexOf(activeItem);
+            
+            if (currentIndex !== -1 && currentIndex + 1 < allVideos.length) {
+                window.location.href = allVideos[currentIndex + 1].getAttribute('href');
+            } else {
+                window.location.reload();
+            }
+        }, 3000);
+    });
+    {% endif %}
+
+    // Collapsable Sidebar Logic
+    function initializeSidebar() {
+        let activeModuleNumber = '1.1';
+        {% if current_video %}
+            activeModuleNumber = '{{ current_video.module.number|default:"1.1" }}';
+        {% endif %}
+
+        // Process sections: keep open if it has active module, else collapse
+        document.querySelectorAll('.section').forEach(section => {
+            const content = section.querySelector('.section-content');
+            const header = section.querySelector('.section-header');
+            
+            let hasActiveModule = false;
+            section.querySelectorAll('.module').forEach(m => {
+                if (m.getAttribute('data-module-number') === activeModuleNumber) {
+                    hasActiveModule = true;
+                }
+            });
+                
+            if (!hasActiveModule && section.querySelectorAll('.module').length > 0) {
+                if (content) content.style.display = 'none';
+                if (header) header.classList.add('collapsed');
+            } else {
+                if (content) content.style.display = 'block';
+                if (header) header.classList.remove('collapsed');
+            }
+        });
+
+        // Process modules: keep open if it is the active module, else collapse
+        document.querySelectorAll('.module').forEach(module => {
+            const modNum = module.getAttribute('data-module-number');
+            const videos = module.querySelector('.module-videos');
+            const header = module.querySelector('.module-header');
+            
+            if (modNum === activeModuleNumber) {
+                if (videos) videos.style.display = 'block';
+                if (header) header.classList.remove('collapsed');
+            } else {
+                if (videos) videos.style.display = 'none';
+                if (header) header.classList.add('collapsed');
+            }
+        });
+    }
+
+    // Run immediately since script is at end of body
+    initializeSidebar();
+
+    // Global toggle functions
+    window.toggleModule = function(header) {
+        header.classList.toggle('collapsed');
+        const content = header.nextElementSibling;
+        if (content) {
+            content.style.display = (content.style.display === 'none') ? 'block' : 'none';
+        }
+    };
+
+    window.toggleSection = function(header) {
+        header.classList.toggle('collapsed');
+        const content = header.nextElementSibling;
+        if (content) {
+            content.style.display = (content.style.display === 'none') ? 'block' : 'none';
+        }
+    };
+</script>
+{% endblock %}
