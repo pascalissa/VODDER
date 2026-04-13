@@ -6,7 +6,7 @@
     <div class="sidebar-header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
             <h2 style="margin:0; font-size:1.1rem;">
-                Progress: {{ completion_percent }}% 
+                Progress: {{ completion_percent }}%
                 <span style="font-size:0.8rem; font-weight:normal; color:#888;">({{ total_watched|format_seconds }} / {{ total_duration|format_seconds }})</span>
             </h2>
             <a href="{% url 'settings' %}"
@@ -23,39 +23,41 @@
                 <div style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     SECTION {{ section.number }}: {{ section.title }}
                 </div>
-                <div style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
+                <div
+                    style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
                     {{ section.total_duration|format_seconds }}
                 </div>
             </div>
             <div class="section-content">
-            {% for module in section.modules.all %}
-            <div class="module" data-module-number="{{ module.number }}">
-                <div class="module-header" onclick="toggleModule(this)">
-                    <div style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                        {{ module.number }} {{ module.title }}
-                    </div>
-                    <div style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
-                        {{ module.total_duration|format_seconds }}
-                    </div>
-                </div>
-                <div class="module-videos">
-                    {% for video in module.videos.all %}
-                    <a href="?v={{ video.id }}"
-                        class="video-item {% if current_video and current_video.id == video.id %}active{% endif %}">
-                        <span class="video-item-title">{{ video.number }} {{ video.title }}</span>
-                        <div class="vid-meta">
-                            <span class="vid-dur">{{ video.duration|format_seconds }}</span>
-                            {% if video.is_completed %}
-                            <span class="check-icon">✓</span>
-                            {% else %}
-                            <span class="uncheck-icon"></span>
-                            {% endif %}
+                {% for module in section.modules.all %}
+                <div class="module" data-module-number="{{ module.number }}">
+                    <div class="module-header" onclick="toggleModule(this)">
+                        <div style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            {{ module.number }} {{ module.title }}
                         </div>
-                    </a>
-                    {% endfor %}
+                        <div
+                            style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
+                            {{ module.total_duration|format_seconds }}
+                        </div>
+                    </div>
+                    <div class="module-videos">
+                        {% for video in module.videos.all %}
+                        <a href="?v={{ video.id }}"
+                            class="video-item {% if current_video and current_video.id == video.id %}active{% endif %}">
+                            <span class="video-item-title">{{ video.number }} {{ video.title }}</span>
+                            <div class="vid-meta">
+                                <span class="vid-dur">{{ video.duration|format_seconds }}</span>
+                                {% if video.is_completed %}
+                                <span class="check-icon">✓</span>
+                                {% else %}
+                                <span class="uncheck-icon"></span>
+                                {% endif %}
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
                 </div>
-            </div>
-            {% endfor %}
+                {% endfor %}
             </div>
         </div>
         {% empty %}
@@ -78,6 +80,16 @@
     <div class="content-panel">
         <h1 style="margin-top:0;">{{ current_video.number }} - {{ current_video.title }}</h1>
         <hr style="border:0; border-bottom:1px solid var(--border-color); margin: 20px 0;">
+        
+        {% if html_content %}
+        <div class="support-text-container" style="padding: 10px 0;">
+            <iframe 
+                style="width: 100%; border: none; background: transparent; overflow-y: hidden;"
+                onload="this.style.height = this.contentWindow.document.body.scrollHeight + 'px';"
+                srcdoc="<style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #c5c6c7; line-height: 1.6; padding: 10px; margin: 0; } a { color: #66fcf1; }</style>{{ html_content|escape }}"
+            ></iframe>
+        </div>
+        {% endif %}
 
     </div>
     {% else %}
@@ -135,7 +147,7 @@
             const allVideos = Array.from(document.querySelectorAll('.video-item'));
             const activeItem = document.querySelector('.video-item.active');
             const currentIndex = allVideos.indexOf(activeItem);
-            
+
             if (currentIndex !== -1 && currentIndex + 1 < allVideos.length) {
                 window.location.href = allVideos[currentIndex + 1].getAttribute('href');
             } else {
@@ -149,21 +161,21 @@
     function initializeSidebar() {
         let activeModuleNumber = '1.1';
         {% if current_video %}
-            activeModuleNumber = '{{ current_video.module.number|default:"1.1" }}';
+        activeModuleNumber = '{{ current_video.module.number|default:"1.1" }}';
         {% endif %}
 
         // Process sections: keep open if it has active module, else collapse
         document.querySelectorAll('.section').forEach(section => {
             const content = section.querySelector('.section-content');
             const header = section.querySelector('.section-header');
-            
+
             let hasActiveModule = false;
             section.querySelectorAll('.module').forEach(m => {
                 if (m.getAttribute('data-module-number') === activeModuleNumber) {
                     hasActiveModule = true;
                 }
             });
-                
+
             if (!hasActiveModule && section.querySelectorAll('.module').length > 0) {
                 if (content) content.style.display = 'none';
                 if (header) header.classList.add('collapsed');
@@ -178,7 +190,7 @@
             const modNum = module.getAttribute('data-module-number');
             const videos = module.querySelector('.module-videos');
             const header = module.querySelector('.module-header');
-            
+
             if (modNum === activeModuleNumber) {
                 if (videos) videos.style.display = 'block';
                 if (header) header.classList.remove('collapsed');
@@ -193,7 +205,7 @@
     initializeSidebar();
 
     // Global toggle functions
-    window.toggleModule = function(header) {
+    window.toggleModule = function (header) {
         header.classList.toggle('collapsed');
         const content = header.nextElementSibling;
         if (content) {
@@ -201,7 +213,7 @@
         }
     };
 
-    window.toggleSection = function(header) {
+    window.toggleSection = function (header) {
         header.classList.toggle('collapsed');
         const content = header.nextElementSibling;
         if (content) {

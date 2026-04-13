@@ -89,7 +89,3 @@ Course Folder/
 - **Metadata:** [Mutagen](https://github.com/quodlibet/mutagen) (for extracting video duration)
 - **Frontend:** Vanilla CSS (Modern Flexbox/Grid) & Django Templates
 
-## Project Rules
-- **No CDNs:** Never add external links to scripts or styles.
-- **No NPM:** Frontend is managed strictly within the Django ecosystem.
-- **Atomic Migrations:** Always run `makemigrations` and `migrate` after updating `models.py`.

@@ -64,6 +64,7 @@ class Video(models.Model):
     progress = models.IntegerField(default=0, help_text="Progress in seconds")
     is_completed = models.BooleanField(default=False)
     order = models.IntegerField(default=0)
+    html_path = models.CharField(max_length=2048, null=True, blank=True)
 
     class Meta:
         ordering = ['order', 'number']

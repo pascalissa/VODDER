@@ -70,12 +70,25 @@ def sync_vod_directory(base_path):
                                         except Exception as e:
                                             pass
 
+                                        # Check for matching HTML file in sibling folder
+                                        html_path_str = None
+                                        try:
+                                            # Replace '/VOD/' with '/HTML/' in the absolute path and change extension
+                                            vid_abs_path = str(vid_path.absolute())
+                                            if '/VOD/' in vid_abs_path:
+                                                possible_html_path = vid_abs_path.replace('/VOD/', '/HTML/').rsplit('.', 1)[0] + '.html'
+                                                if Path(possible_html_path).exists():
+                                                    html_path_str = possible_html_path
+                                        except Exception:
+                                            pass
+
                                         Video.objects.update_or_create(
                                             module=module,
                                             number=v_num,
                                             defaults={
                                                 'title': v_title,
                                                 'file_path': str(vid_path.absolute()),
+                                                'html_path': html_path_str,
                                                 'duration': duration,
                                                 'order': v_order
                                             }

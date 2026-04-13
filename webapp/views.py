@@ -42,6 +42,15 @@ def dashboard(request):
     completed_duration = base_video_qs.filter(is_completed=True).aggregate(Sum('duration'))['duration__sum'] or 0
     in_progress_watched = base_video_qs.filter(is_completed=False).aggregate(Sum('progress'))['progress__sum'] or 0
     total_watched = completed_duration + in_progress_watched
+    
+    html_content = ""
+    if current_video and current_video.html_path:
+        if os.path.exists(current_video.html_path):
+            try:
+                with open(current_video.html_path, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+            except Exception:
+                pass
 
     return render(request, 'webapp/dashboard.html', {
         'sections': sections,
@@ -49,6 +58,7 @@ def dashboard(request):
         'completion_percent': completion_percentage,
         'total_duration': total_duration,
         'total_watched': total_watched,
+        'html_content': html_content,
     })
 
 def settings_view(request):
