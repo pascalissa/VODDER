@@ -40,6 +40,11 @@ class Section(models.Model):
     def total_duration(self):
         return sum(m.total_duration for m in self.modules.all())
 
+    @property
+    def is_completed(self):
+        modules = self.modules.all()
+        return bool(modules) and all(m.is_completed for m in modules)
+
 class Module(models.Model):
     section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name='modules')
     number = models.CharField(max_length=20, help_text="e.g., '1.1'")
@@ -55,6 +60,11 @@ class Module(models.Model):
     @property
     def total_duration(self):
         return sum(v.duration for v in self.videos.all())
+
+    @property
+    def is_completed(self):
+        videos = self.videos.all()
+        return bool(videos) and all(v.is_completed for v in videos)
 
 class Video(models.Model):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='videos')

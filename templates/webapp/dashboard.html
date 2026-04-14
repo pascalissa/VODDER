@@ -30,8 +30,12 @@
                     SECTION {{ section.number }}: {{ section.title }}
                 </div>
                 <div
-                    style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
+                    style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px; display:flex; align-items:center;">
+                    {% if section.is_completed %}
+                    <span class="check-icon">✓</span>
+                    {% else %}
                     {{ section.total_duration|format_seconds }}
+                    {% endif %}
                 </div>
             </div>
             <div class="section-content">
@@ -42,8 +46,12 @@
                             {{ module.number }} {{ module.title }}
                         </div>
                         <div
-                            style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px;">
+                            style="font-weight: normal; font-size:0.8rem; color:var(--text-dark); white-space:nowrap; margin-left:10px; display:flex; align-items:center;">
+                            {% if module.is_completed %}
+                            <span class="check-icon">✓</span>
+                            {% else %}
                             {{ module.total_duration|format_seconds }}
+                            {% endif %}
                         </div>
                     </div>
                     <div class="module-videos">
