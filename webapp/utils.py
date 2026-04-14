@@ -26,10 +26,24 @@ def sync_vod_directory(base_path):
             s_match = section_pattern.match(item_path.name)
             if s_match:
                 s_num, s_title = s_match.groups()
+
+                quiz_path_str = None
+                try:
+                    sec_abs_path = str(item_path.absolute())
+                    if '/VOD/' in sec_abs_path:
+                        html_sec_path = Path(sec_abs_path.replace('/VOD/', '/HTML/'))
+                        if html_sec_path.exists() and html_sec_path.is_dir():
+                            for f in html_sec_path.iterdir():
+                                if f.is_file() and f.name.endswith('.json'):
+                                    quiz_path_str = str(f.absolute())
+                                    break
+                except Exception:
+                    pass
+
                 section, _ = Section.objects.update_or_create(
                     course=course,
                     number=s_num,
-                    defaults={'title': s_title, 'order': int(s_num)}
+                    defaults={'title': s_title, 'order': int(s_num), 'quiz_path': quiz_path_str}
                 )
 
                 for mod_path in item_path.iterdir():

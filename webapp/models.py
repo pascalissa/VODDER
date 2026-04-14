@@ -27,6 +27,7 @@ class Section(models.Model):
     number = models.CharField(max_length=10, help_text="e.g., '1'")
     title = models.CharField(max_length=200)
     order = models.IntegerField(default=0)
+    quiz_path = models.CharField(max_length=2048, null=True, blank=True)
 
     class Meta:
         ordering = ['course', 'order', 'number']

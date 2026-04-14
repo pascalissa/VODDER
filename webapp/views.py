@@ -61,6 +61,50 @@ def dashboard(request):
         'html_content': html_content,
     })
 
+def quiz_view(request, section_id):
+    section_obj = get_object_or_404(Section, id=section_id)
+    
+    vod_setting = AppSetting.objects.filter(key='VOD_DIR_PATH').first()
+    active_path = vod_setting.value if vod_setting else None
+    
+    from pathlib import Path
+    course_path = str(Path(active_path).absolute()) if active_path else ""
+    
+    sections = Section.objects.filter(course__folder_path=course_path).prefetch_related('modules__videos').all()
+    base_video_qs = Video.objects.filter(module__section__course__folder_path=course_path)
+
+    total_videos = base_video_qs.count()
+    completed_videos = base_video_qs.filter(is_completed=True).count()
+    completion_percentage = int((completed_videos / total_videos * 100)) if total_videos > 0 else 0
+
+    total_duration = base_video_qs.aggregate(Sum('duration'))['duration__sum'] or 0
+    completed_duration = base_video_qs.filter(is_completed=True).aggregate(Sum('duration'))['duration__sum'] or 0
+    in_progress_watched = base_video_qs.filter(is_completed=False).aggregate(Sum('progress'))['progress__sum'] or 0
+    total_watched = completed_duration + in_progress_watched
+    
+    quiz_data = []
+    if section_obj.quiz_path and os.path.exists(section_obj.quiz_path):
+        try:
+            with open(section_obj.quiz_path, 'r', encoding='utf-8') as f:
+                raw_data = json.load(f)
+                for key, val in raw_data.items():
+                    quiz_data.append(val)
+        except Exception:
+            pass
+
+    return render(request, 'webapp/dashboard.html', {
+        'sections': sections,
+        'current_video': None,
+        'completion_percent': completion_percentage,
+        'total_duration': total_duration,
+        'total_watched': total_watched,
+        'html_content': '',
+        'current_quiz': {
+            'section': section_obj,
+            'questions': json.dumps(quiz_data)
+        }
+    })
+
 def settings_view(request):
     vod_setting, _ = AppSetting.objects.get_or_create(key='VOD_DIR_PATH')
     message = None

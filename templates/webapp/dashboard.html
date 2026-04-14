@@ -2,6 +2,12 @@
 {% load vod_filters %}
 
 {% block layout %}
+<style>
+    .module-header.no-arrow::before {
+        display: none !important;
+        content: none !important;
+    }
+</style>
 <aside class="sidebar">
     <div class="sidebar-header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -58,6 +64,15 @@
                     </div>
                 </div>
                 {% endfor %}
+                {% if section.quiz_path %}
+                <div class="module">
+                    <a href="{% url 'quiz_view' section.id %}" class="module-header no-arrow {% if current_quiz and current_quiz.section.id == section.id %}active{% endif %}" style="text-decoration:none; color:inherit; display:flex;">
+                        <div style="flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left: 20px;">
+                            Take Quiz: Section {{ section.number }}
+                        </div>
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </div>
         {% empty %}
@@ -70,7 +85,53 @@
 </aside>
 
 <main class="main-content">
-    {% if current_video %}
+    {% if current_quiz %}
+    <div class="quiz-container"
+        style="flex:1; padding: 40px; display:flex; flex-direction:column; max-width: 900px; margin: 0 auto; width: 100%;">
+        <div
+            style="display:flex; justify-content:space-between; align-items:flex-end; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 20px;">
+            <div style="display:flex; gap: 20px; align-items:baseline;">
+                <h2 id="quiz-progress-text" style="margin:0;">Question 1 of 20</h2>
+                <span id="quiz-correct-count" style="color: #4CAF50; font-weight:bold;">0 Correct</span>
+                <span id="quiz-incorrect-count" style="color: #F44336; font-weight:bold;">0 Incorrect</span>
+            </div>
+            <div style="font-size: 0.9rem; color: #ccc;">Passing score is 80% (16 correct answers)</div>
+        </div>
+
+        <div id="quiz-question-area">
+            <h3 id="quiz-question-text" style="font-weight:normal; font-size:1.2rem; margin-bottom: 20px;">Loading
+                question...</h3>
+            <div id="quiz-options-area" style="display:flex; flex-direction:column; gap: 15px; margin-bottom: 40px;">
+                <!-- Options injected via JS -->
+            </div>
+
+            <div id="quiz-feedback-area" style="display:none; margin-bottom: 20px; flex-direction:column; gap: 10px;">
+                <div style="display:flex; align-items:center; gap: 10px;">
+                    <span id="quiz-feedback-icon" style="font-size: 1.2rem; font-weight:bold;"></span>
+                    <span id="quiz-feedback-text" style="font-size: 1.1rem; font-weight:bold;"></span>
+                    <a href="#" id="quiz-feedback-toggle"
+                        style="color:#fff; text-decoration:none; font-size:0.9rem; margin-left:10px;">See why ▾</a>
+                </div>
+                <div id="quiz-feedback-explanation"
+                    style="display:none; color:#ddd; line-height:1.5; padding: 10px; background:rgba(255,255,255,0.05); border-radius:5px;">
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; align-items:center; gap: 20px;">
+                <a href="{% url 'dashboard' %}" style="color:var(--accent); text-decoration:none;">← Return to
+                    Course</a>
+                <button id="quiz-action-btn" class="btn btn-primary" style="padding: 10px 20px; font-size: 1rem;">Submit
+                    Answer</button>
+            </div>
+        </div>
+
+        <div id="quiz-summary-area" style="display:none; text-align:center; padding-top: 40px;">
+            <h2 id="quiz-summary-title">Quiz Completed!</h2>
+            <p id="quiz-summary-score" style="font-size: 1.2rem; margin: 20px 0;"></p>
+            <a href="{% url 'dashboard' %}" class="btn btn-primary">Return to Course</a>
+        </div>
+    </div>
+    {% elif current_video %}
     <div class="video-container">
         <video id="player" controls autoplay>
             <source src="{% url 'video_stream' current_video.id %}" type="video/mp4">
@@ -80,14 +141,12 @@
     <div class="content-panel">
         <h1 style="margin-top:0;">{{ current_video.number }} - {{ current_video.title }}</h1>
         <hr style="border:0; border-bottom:1px solid var(--border-color); margin: 20px 0;">
-        
+
         {% if html_content %}
         <div class="support-text-container" style="padding: 10px 0;">
-            <iframe 
-                style="width: 100%; border: none; background: transparent; overflow-y: hidden;"
+            <iframe style="width: 100%; border: none; background: transparent; overflow-y: hidden;"
                 onload="this.style.height = this.contentWindow.document.body.scrollHeight + 'px';"
-                srcdoc="<style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #c5c6c7; line-height: 1.6; padding: 10px; margin: 0; } a { color: #66fcf1; }</style>{{ html_content|escape }}"
-            ></iframe>
+                srcdoc="<style>body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #c5c6c7; line-height: 1.6; padding: 10px; margin: 0; } a { color: #66fcf1; }</style>{{ html_content|escape }}"></iframe>
         </div>
         {% endif %}
 
@@ -160,8 +219,12 @@
     // Collapsable Sidebar Logic
     function initializeSidebar() {
         let activeModuleNumber = '1.1';
+        let activeSectionId = null;
         {% if current_video %}
         activeModuleNumber = '{{ current_video.module.number|default:"1.1" }}';
+        {% elif current_quiz %}
+        activeSectionId = '{{ current_quiz.section.id }}';
+        activeModuleNumber = null;
         {% endif %}
 
         // Process sections: keep open if it has active module, else collapse
@@ -169,14 +232,18 @@
             const content = section.querySelector('.section-content');
             const header = section.querySelector('.section-header');
 
-            let hasActiveModule = false;
-            section.querySelectorAll('.module').forEach(m => {
-                if (m.getAttribute('data-module-number') === activeModuleNumber) {
-                    hasActiveModule = true;
-                }
-            });
+            let hasActiveElement = false;
+            if (activeModuleNumber) {
+                section.querySelectorAll('.module').forEach(m => {
+                    if (m.getAttribute('data-module-number') === activeModuleNumber) {
+                        hasActiveElement = true;
+                    }
+                });
+            } else if (activeSectionId && section.querySelector(`a[href*="/quiz/${activeSectionId}/"]`)) {
+                hasActiveElement = true;
+            }
 
-            if (!hasActiveModule && section.querySelectorAll('.module').length > 0) {
+            if (!hasActiveElement && section.querySelectorAll('.module').length > 0) {
                 if (content) content.style.display = 'none';
                 if (header) header.classList.add('collapsed');
             } else {
@@ -220,5 +287,185 @@
             content.style.display = (content.style.display === 'none') ? 'block' : 'none';
         }
     };
+
+    {% if current_quiz %}
+    const rawQuestions = JSON.parse(`{{ current_quiz.questions|escapejs }}`);
+
+    // Shuffle array function (Fisher-Yates)
+    function shuffleArray(array) {
+        let curId = array.length;
+        while (0 !== curId) {
+            let randId = Math.floor(Math.random() * curId);
+            curId -= 1;
+            let tmp = array[curId];
+            array[curId] = array[randId];
+            array[randId] = tmp;
+        }
+        return array;
+    }
+
+    // Process questions: add a proper options array that keeps track of the original correct answer
+    // The correct answer is always option 0 originally.
+    let quizQuestions = rawQuestions.map(q => {
+        let options = q.options.map((opt, idx) => ({ text: opt, isCorrect: idx === 0 }));
+        options = shuffleArray(options);
+        return {
+            question: q.question,
+            options: options,
+            explanation: q.answer
+        };
+    });
+
+    // Shuffle the order of questions
+    quizQuestions = shuffleArray(quizQuestions);
+
+    let currentQIndex = 0;
+    let correctCount = 0;
+    let incorrectCount = 0;
+
+    let quizState = 'WAITING_ANSWER'; // WAITING_ANSWER | SHOWING_FEEDBACK
+
+    function updateScoreUI() {
+        document.getElementById('quiz-correct-count').textContent = correctCount + " Correct";
+        document.getElementById('quiz-incorrect-count').textContent = incorrectCount + " Incorrect";
+        document.getElementById('quiz-progress-text').textContent = "Question " + (currentQIndex + 1) + " of " + quizQuestions.length;
+    }
+
+    function renderQuestion() {
+        if (currentQIndex >= quizQuestions.length) {
+            showSummary();
+            return;
+        }
+        updateScoreUI();
+        quizState = 'WAITING_ANSWER';
+        const q = quizQuestions[currentQIndex];
+        document.getElementById('quiz-question-text').textContent = q.question;
+
+        const optionsArea = document.getElementById('quiz-options-area');
+        optionsArea.innerHTML = '';
+
+        q.options.forEach((opt, idx) => {
+            const label = document.createElement('label');
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.gap = '15px';
+            label.style.cursor = 'pointer';
+            label.style.padding = '10px';
+            label.style.borderRadius = '5px';
+            label.style.transition = 'background 0.2s';
+            label.innerHTML = `
+                <input type="radio" name="quiz_option" value="${idx}" style="transform: scale(1.5);">
+                <span class="opt-text" style="font-size: 1.1rem;">${opt.text}</span>
+                <span class="opt-icon" style="margin-left:auto; display:none; font-weight:bold;"></span>
+            `;
+            // Hover effect
+            label.onmouseover = () => { if (quizState === 'WAITING_ANSWER') label.style.background = 'rgba(255,255,255,0.05)'; };
+            label.onmouseout = () => { if (quizState === 'WAITING_ANSWER') label.style.background = 'transparent'; };
+
+            optionsArea.appendChild(label);
+        });
+
+        document.getElementById('quiz-feedback-area').style.display = 'none';
+        document.getElementById('quiz-action-btn').textContent = 'Submit Answer';
+        document.getElementById('quiz-action-btn').disabled = false;
+        document.getElementById('quiz-feedback-explanation').style.display = 'none';
+        document.getElementById('quiz-feedback-toggle').innerHTML = 'See why ▾';
+    }
+
+    function showSummary() {
+        document.getElementById('quiz-question-area').style.display = 'none';
+        document.getElementById('quiz-summary-area').style.display = 'block';
+
+        const isPassed = correctCount >= Math.ceil(quizQuestions.length * 0.8);
+        document.getElementById('quiz-summary-title').textContent = isPassed ? 'Congratulations! You passed.' : 'Quiz Completed. Keep studying!';
+        document.getElementById('quiz-summary-score').innerHTML = `You scored <strong>${correctCount}</strong> out of ${quizQuestions.length} (${Math.round((correctCount / quizQuestions.length) * 100)}%).`;
+        document.getElementById('quiz-summary-title').style.color = isPassed ? '#4CAF50' : '#F44336';
+    }
+
+    document.getElementById('quiz-feedback-toggle').addEventListener('click', (e) => {
+        e.preventDefault();
+        const exp = document.getElementById('quiz-feedback-explanation');
+        if (exp.style.display === 'none') {
+            exp.style.display = 'block';
+            e.target.innerHTML = 'See why ▴';
+        } else {
+            exp.style.display = 'none';
+            e.target.innerHTML = 'See why ▾';
+        }
+    });
+
+    document.getElementById('quiz-action-btn').addEventListener('click', () => {
+        if (quizState === 'WAITING_ANSWER') {
+            const selected = document.querySelector('input[name="quiz_option"]:checked');
+            if (!selected) {
+                alert('Please select an answer.');
+                return;
+            }
+
+            quizState = 'SHOWING_FEEDBACK';
+            const selectedIdx = parseInt(selected.value);
+            const q = quizQuestions[currentQIndex];
+            const isCorrect = q.options[selectedIdx].isCorrect;
+
+            if (isCorrect) {
+                correctCount++;
+            } else {
+                incorrectCount++;
+            }
+
+            updateScoreUI();
+
+            // Re-style options to show correctness
+            const labels = document.getElementById('quiz-options-area').querySelectorAll('label');
+            labels.forEach((lbl, idx) => {
+                const radio = lbl.querySelector('input');
+                radio.disabled = true;
+                const icon = lbl.querySelector('.opt-icon');
+
+                if (q.options[idx].isCorrect) {
+                    lbl.style.color = '#4CAF50';
+                    icon.textContent = '✓';
+                    icon.style.color = '#4CAF50';
+                    icon.style.display = 'inline';
+                }
+
+                if (idx === selectedIdx && !isCorrect) {
+                    lbl.style.color = '#F44336';
+                    icon.textContent = '✗';
+                    icon.style.color = '#F44336';
+                    icon.style.display = 'inline';
+                }
+            });
+
+            const fbArea = document.getElementById('quiz-feedback-area');
+            const fbIcon = document.getElementById('quiz-feedback-icon');
+            const fbText = document.getElementById('quiz-feedback-text');
+            const fbExp = document.getElementById('quiz-feedback-explanation');
+
+            fbArea.style.display = 'flex';
+            if (isCorrect) {
+                fbIcon.textContent = '✓';
+                fbIcon.style.color = '#4CAF50';
+                fbText.textContent = 'That is correct.';
+                fbText.style.color = '#4CAF50';
+            } else {
+                fbIcon.textContent = '✗';
+                fbIcon.style.color = '#F44336';
+                fbText.textContent = 'Incorrect.';
+                fbText.style.color = '#F44336';
+            }
+            fbExp.innerHTML = q.explanation;
+
+            document.getElementById('quiz-action-btn').textContent = 'Next Question';
+        } else if (quizState === 'SHOWING_FEEDBACK') {
+            currentQIndex++;
+            renderQuestion();
+        }
+    });
+
+    if (quizQuestions && quizQuestions.length > 0) {
+        renderQuestion();
+    }
+    {% endif %}
 </script>
 {% endblock %}
